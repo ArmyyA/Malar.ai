@@ -1,2 +1,2 @@
-# Malaria Classification
+# Malar.ai
  
