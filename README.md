@@ -32,7 +32,7 @@ In this project, I adapt the ResNet50 architecture, pre-trained on ImageNet, to 
    cd Malar.ai
    ```
 
-2. Place your dataset in the appropriate directory (`malaria-dataset/positive` for positive samples and `malaria-dataset/negative` for negative samples).
+2. Place your dataset in the appropriate directory (`images/Parasitized` for positive samples and `images/Uninfected` for negative samples).
 
 3. Run the script:
 
@@ -51,4 +51,4 @@ The model performance was evaluated using the following metrics:
 
 **Training Results**:
 
-- Prediction Accuracy: 97%
+- Prediction Accuracy: **97%**
