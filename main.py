@@ -4,15 +4,14 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 
 from keras.applications import ResNet50
-from keras.layers import Dense, GlobalAveragePooling2D, Input
+from keras.layers import Dense, GlobalAveragePooling2D, Input, Conv2D
 from keras.models import Model
-from keras.utils import to_categorical
 
 # Read and resize the images
 images = []
 labels = []
-positive_dir = 'malaria-dataset/positive'
-negative_dir = 'malaria-dataset/negative'
+positive_dir = 'images/Parasitized'
+negative_dir = 'images/Uninfected'
 
 for filename in os.listdir(positive_dir):
     print('first')
@@ -49,9 +48,24 @@ input_tensor = Input(shape=(224, 224, 1))
 resnet = ResNet50(weights='imagenet', include_top=False,
                   input_shape=(224, 224, 3))
 
+conv1_weights = resnet.layers[1].getweights()
+gray_weights = [0.299 * conv1_weights[0][:, :, 0, :] + 0.587 *
+                conv1_weights[0][:, :, 1, :] + 0.114 * conv1_weights[0][:, :, 2, :]]
+gray_weights.append(conv1_weights[1])
+
+# Create a new convolutional layer for grayscale and set its weights
+new_conv1 = Conv2D(64, (7, 7), strides=(
+    2, 2), padding='valid', name='conv1')(input_tensor)
+new_conv1_layer = Model(inputs=input_tensor, outputs=new_conv1)
+new_conv1_layer.layers[1].set_weights(gray_weights)
+
+# Reconstruct ResNet with the grayscale layer
+custom_resnet_output = new_conv1
+for layer in resnet.layers[2:]:
+    custom_resnet_output = layer(custom_resnet_output)
+
 # Add a global spatial average pooling layer
-x = resnet.output
-x = GlobalAveragePooling2D()(x)
+x = GlobalAveragePooling2D()(custom_resnet_output)
 
 # Add a fully-connected layer
 x = Dense(1024, activation='relu')(x)
@@ -60,10 +74,10 @@ x = Dense(1024, activation='relu')(x)
 predictions = Dense(1, activation='sigmoid')(x)
 
 # Create a new model
-model = Model(inputs=resnet.input, outputs=predictions)
+model = Model(inputs=input_tensor, outputs=predictions)
 
-# Freeze the layers of the pre-trained model
-for layer in resnet.layers:
+# Freeze the layers in modified ResNet50
+for layer in new_conv1_layer.layers + resnet.layers:
     layer.trainable = False
 
 # Compile the model using binary_crossentropy
@@ -86,12 +100,16 @@ X_train, y_train, X_val, y_val = preprocess_data(
 X_train = np.expand_dims(X_train, -1)
 X_val = np.expand_dims(X_val, -1)
 
-X_train = X_train / 255
-X_val = X_val / 255
 
 # Change the input data to have 3 channels
 X_train = np.repeat(X_train, 3, axis=-1)
 X_val = np.repeat(X_val, 3, axis=-1)
+
+# ImageNet mean
+mean_value = (123.68 + 116.779 + 103.939) / 3.0
+
+X_train = (X_train - mean_value) / 255.0
+X_val = (X_val - mean_value) / 255.0
 
 # Train the model
 print("Model Training will now begin:")
